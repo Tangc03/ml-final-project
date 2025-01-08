@@ -78,17 +78,17 @@ def save_B_matrix_plot(B, iteration, output_dir='B_plots'):
     plt.savefig(os.path.join(output_dir, f'B_iter_{iteration}.png'))
     plt.close()
 
-def plot_B_matrix(B):
+def plot_B_matrix(B, output_file='B_matrix.png'):
     plt.figure(figsize=(8, 6))
     plt.imshow(B, cmap='viridis', aspect='auto')
     plt.colorbar(label='值')
     plt.title('最终得到的 B 矩阵')
     plt.xlabel('列索引')
     plt.ylabel('行索引')
-    plt.savefig('B_matrix.png')
+    plt.savefig(output_file)
     plt.show()
 
-def plot_norms_history(norms_history):
+def plot_norms_history(norms_history, output_file='norms_history.png'):
     norms_history = np.array(norms_history)
     plt.figure(figsize=(10, 6))
     for i in range(norms_history.shape[1]):
@@ -97,7 +97,7 @@ def plot_norms_history(norms_history):
     plt.ylabel('行向量范数')
     plt.title('B 矩阵行向量范数的变化')
     plt.legend()
-    plt.savefig('norms_history.png')
+    plt.savefig(output_file)
     plt.show()
 
 # ============ Theta 图像绘制相关函数 ============
@@ -342,21 +342,36 @@ def iterative_lattice_construction(n,
 
 if __name__ == "__main__":
     np.random.seed(42)  # 固定随机种子便于演示
-    n = 10             # 维度
-    T = int(1e5)       # 迭代次数，示例中使用较小的值
+    # n = 10             # 维度
+    T = int(1e6)       # 迭代次数，示例中使用较小的值
     Tr = 100           # 每隔多少步做一次 RED+ORTH
-    mu0 = 0.01
-    nu = 500.0
+    mu0 = 0.005
+    nu = 200.0
 
-    # 启用保存图像和 Theta 图像绘制
-    B_final, norms_history = iterative_lattice_construction(
-        n, T, Tr, mu0, nu, save_plots=True, output_dir='B_plots',
-        compute_theta=True, theta_r_max=5.0, theta_r_step=0.1,
-        theta_output_file='theta_image.png',
-        # theta_method='monte_carlo',  # 选择使用蒙特卡洛方法
-        theta_num_samples=100000      # 设定采样次数
-    )
-    print("最终得到的 B 矩阵：")
-    print(B_final)
-    plot_B_matrix(B_final)
-    plot_norms_history(norms_history)
+    # # 启用保存图像和 Theta 图像绘制
+    # B_final, norms_history = iterative_lattice_construction(
+    #     n, T, Tr, mu0, nu, save_plots=True, output_dir='B_plots',
+    #     compute_theta=True, theta_r_max=1.5, theta_r_step=0.5,
+    #     theta_output_file='theta_image.png',
+    #     # theta_method='monte_carlo',  # 选择使用蒙特卡洛方法
+    #     theta_num_samples=100000      # 设定采样次数
+    # )
+    # print("最终得到的 B 矩阵：")
+    # print(B_final)
+    # plot_B_matrix(B_final)
+    # plot_norms_history(norms_history)
+
+    n_list = [10, 11, 12, 13, 14, 15, 16]
+    for n in n_list:
+        # 启用保存图像和 Theta 图像绘制
+        B_final, norms_history = iterative_lattice_construction(
+            n, T, Tr, mu0, nu, save_plots=True, output_dir='B_plots/n_{}'.format(n),
+            compute_theta=True, theta_r_max=1.8, theta_r_step=0.3,
+            theta_output_file='theta_image_n_{}.png'.format(n),
+            # theta_method='monte_carlo',  # 选择使用蒙特卡洛方法
+            # theta_num_samples=100000      # 设定采样次数
+        )
+        print("最终得到的 B 矩阵：")
+        print(B_final)
+        plot_B_matrix(B_final, output_file='B_matrix_n_{}.png'.format(n))
+        plot_norms_history(norms_history, output_file='norms_history_n_{}.png'.format(n))
