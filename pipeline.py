@@ -1,6 +1,7 @@
 import numpy as np
 from utils.LLL import LLL_reduction
 from utils.new_search_fixed import search_nearest_point, sign
+from tqdm import tqdm  # 导入 tqdm
 
 # ============ 一些基础函数 ============
 
@@ -85,7 +86,8 @@ def iterative_lattice_construction(n,
                                    T=10,
                                    Tr=3,
                                    mu0=1.0,
-                                   nu=2.0):
+                                   nu=2.0,
+                                   tqdm_update_freq=1000):
     """
     按题目伪代码，实现“迭代构造晶格基”
     参数:
@@ -93,6 +95,7 @@ def iterative_lattice_construction(n,
       T: 主循环次数 (for t in [0..T-1])
       Tr: 每多少次迭代进行一次重新约减 + 正交化
       mu0, nu: 用于更新步长 μ 的参数 (μ = μ0 * ν^(-t/(T-1)))
+      tqdm_update_freq: 每多少次迭代更新一次进度条
     返回:
       B: 迭代后得到的生成矩阵
     """
@@ -110,43 +113,53 @@ def iterative_lattice_construction(n,
     B = alpha * B
 
     # 3. 主循环
-    for t in range(T):
-        # 5. 更新 μ = μ0 * ν^(-t/(T-1))
-        if T > 1:
-            mu = mu0 * (nu ** ( - float(t) / (T - 1) ))
-        else:
-            mu = mu0
-        
-        # 6. z <- URAN(n)
-        z = URAN(n)
+    with tqdm(total=T, desc="迭代进度") as pbar:
+        for t in range(T):
+            # 5. 更新 μ = μ0 * ν^(-t/(T-1))
+            if T > 1:
+                mu = mu0 * (nu ** ( - float(t) / (T - 1) ))
+            else:
+                mu = mu0
+            
+            # 6. z <- URAN(n)
+            z = URAN(n)
 
-        # 7. u_hat <- CLP(B, zB)，然后 y = z - u_hat
-        zB = z @ B           # z 是 1×n, B 是 n×n => zB 仍是 n 维向量
-        u_hat = CLP(B, zB)   # 最近点对应的整向量
-        y = z - u_hat        # 仍是 n 维向量
+            # 7. u_hat <- CLP(B, zB)，然后 y = z - u_hat
+            zB = z @ B           # z 是 1×n, B 是 n×n => zB 仍是 n 维向量
+            u_hat = CLP(B, zB)   # 最近点对应的整向量
+            y = z - u_hat        # 仍是 n 维向量
 
-        # 8. e <- yB
-        e = y @ B
+            # 8. e <- yB
+            e = y @ B
 
-        # 9~14: 更新 B[i,j]
-        e_norm_sq = np.linalg.norm(e)**2
-        for i_idx in range(n):
-            for j_idx in range(i_idx):
-                B[i_idx, j_idx] -= mu * y[i_idx] * e[j_idx]
-            # 对角元素
-            bii = B[i_idx, i_idx]
-            B[i_idx, i_idx] = bii - mu * ( y[i_idx]*e[i_idx] - e_norm_sq / (n * bii) )
+            # 9~14: 更新 B[i,j]
+            e_norm_sq = np.linalg.norm(e)**2
+            for i_idx in range(n):
+                for j_idx in range(i_idx):
+                    B[i_idx, j_idx] -= mu * y[i_idx] * e[j_idx]
+                # 对角元素
+                bii = B[i_idx, i_idx]
+                B[i_idx, i_idx] = bii - mu * ( y[i_idx]*e[i_idx] - e_norm_sq / (n * bii) )
 
-        # 15. 每隔 Tr 步做一次 B <- ORTH( RED( B ) )
-        if (t % Tr) == (Tr - 1):
-            B = RED(B)
-            B = ORTH(B)
-            # 再做一次 (∏ B[i,i])^(-1/n) 的缩放
-            diag_prod = 1.0
-            for i in range(n):
-                diag_prod *= B[i, i]
-            alpha = diag_prod ** (-1.0 / n)
-            B = alpha * B
+            # 15. 每隔 Tr 步做一次 B <- ORTH( RED( B ) )
+            if (t % Tr) == (Tr - 1):
+                B = RED(B)
+                B = ORTH(B)
+                # 再做一次 (∏ B[i,i])^(-1/n) 的缩放
+                diag_prod = 1.0
+                for i in range(n):
+                    diag_prod *= B[i, i]
+                alpha = diag_prod ** (-1.0 / n)
+                B = alpha * B
+
+            # 每 tqdm_update_freq 步更新一次进度条
+            if (t + 1) % tqdm_update_freq == 0:
+                pbar.update(tqdm_update_freq)
+
+        # 更新剩余的步数
+        remaining = T % tqdm_update_freq
+        if remaining > 0:
+            pbar.update(remaining)
 
     return B
 
@@ -154,9 +167,9 @@ def iterative_lattice_construction(n,
 
 if __name__ == "__main__":
     np.random.seed(42)  # 固定随机种子便于演示
-    n = 10      # 维度
-    T = int(1e7)      # 迭代次数
-    Tr = 100     # 每隔多少步做一次 RED+ORTH
+    n = 10          # 维度
+    T = int(1e7)     # 迭代次数
+    Tr = 100        # 每隔多少步做一次 RED+ORTH
     mu0 = 0.01
     nu = 500.0
 
