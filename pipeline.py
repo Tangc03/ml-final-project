@@ -351,9 +351,9 @@ if __name__ == "__main__":
     # 启用保存图像和 Theta 图像绘制
     B_final, norms_history = iterative_lattice_construction(
         n, T, Tr, mu0, nu, save_plots=True, output_dir='B_plots',
-        compute_theta=True, theta_r_max=10.0, theta_r_step=0.1,
+        compute_theta=True, theta_r_max=5.0, theta_r_step=0.1,
         theta_output_file='theta_image.png',
-        theta_method='monte_carlo',  # 选择使用蒙特卡洛方法
+        # theta_method='monte_carlo',  # 选择使用蒙特卡洛方法
         theta_num_samples=100000      # 设定采样次数
     )
     print("最终得到的 B 矩阵：")
