@@ -22,7 +22,7 @@ def RED(B):
     """
     Reduction:
     使用 Lenstra–Lenstra–Lovász (LLL) 算法对基 B 进行长度和近似正交的约减。
-    这里直接调用题目中给出的 LLL_reduction。
+    这里直接调用给出的 LLL_reduction。
     注意：LLL_reduction 输入输出都是“列表的列表”形式，这里需要做适配。
     """
     # B 可能是 numpy 数组，LLL_reduction 里直接操作列表。
