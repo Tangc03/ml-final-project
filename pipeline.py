@@ -368,11 +368,11 @@ if __name__ == "__main__":
         B_final, norms_history = iterative_lattice_construction(
             n, T, Tr, mu0, nu, save_plots=True, output_dir='B_plots/n_{}'.format(n),
             compute_theta=True, theta_r_max=1.8, theta_r_step=0.3,
-            theta_output_file='theta_image_n_{}.png'.format(n),
+            theta_output_file='theta_images/theta_image_n_{}.png'.format(n),
             # theta_method='monte_carlo',  # 选择使用蒙特卡洛方法
             # theta_num_samples=100000      # 设定采样次数
         )
         print("最终得到的 B 矩阵：")
         print(B_final)
-        plot_B_matrix(B_final, output_file='B_matrix_n_{}.png'.format(n))
-        plot_norms_history(norms_history, output_file='norms_history_n_{}.png'.format(n))
+        plot_B_matrix(B_final, output_file='B_matrixes/B_matrix_n_{}.png'.format(n))
+        plot_norms_history(norms_history, output_file='norms_histories/norms_history_n_{}.png'.format(n))
