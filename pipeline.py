@@ -4,6 +4,7 @@ from utils.new_search_fixed import search_nearest_point, sign
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import os
+from scipy.special import gamma  # 导入伽玛函数
 
 # 设置全局字体为支持中文的字体（如 SimHei 或 Microsoft YaHei）
 plt.rcParams['font.family'] = 'Microsoft YaHei' # 使用微软雅黑字体
@@ -84,8 +85,8 @@ def plot_B_matrix(B):
     plt.title('最终得到的 B 矩阵')
     plt.xlabel('列索引')
     plt.ylabel('行索引')
-    plt.show()
     plt.savefig('B_matrix.png')
+    plt.show()
 
 def plot_norms_history(norms_history):
     norms_history = np.array(norms_history)
@@ -96,8 +97,126 @@ def plot_norms_history(norms_history):
     plt.ylabel('行向量范数')
     plt.title('B 矩阵行向量范数的变化')
     plt.legend()
-    plt.show()
     plt.savefig('norms_history.png')
+    plt.show()
+
+# ============ Theta 图像绘制相关函数 ============
+
+def count_lattice_points(B, r):
+    """
+    计算在半径 r 内的晶格点数量 N(B, r)
+    
+    参数:
+        B: 生成矩阵 (n x n)
+        r: 半径
+    
+    返回:
+        count: 晶格点数量
+    """
+    n = B.shape[0]
+    count = 0
+    r_squared = r**2
+
+    # 递归函数生成 u 向量
+    def recurse(dim, current_u, current_norm_sq):
+        nonlocal count
+        if dim == n:
+            if current_norm_sq <= r_squared:
+                count += 1
+            return
+        # 估计当前维度的可能范围
+        # ||uB||^2 = sum_{i=1}^n (sum_{j=1}^n u_j B_{j,i})^2 <= r^2
+        # 这里进行简单的限制，避免过多递归
+        # 计算每个维度 u_j 的范围
+        # 这里假设 B 的列已被正交化，可以进一步优化
+        for u_j in range(-int(r) - 1, int(r) + 2):
+            new_norm_sq = current_norm_sq + (u_j * B[dim, dim])**2
+            if new_norm_sq <= r_squared:
+                recurse(dim + 1, current_u + [u_j], new_norm_sq)
+
+    recurse(0, [], 0)
+    return count
+
+def count_lattice_points_monte_carlo(B, r, num_samples=100000):
+    """
+    使用蒙特卡洛方法估计在半径 r 内的晶格点数量 N(B, r)
+    
+    参数:
+        B: 生成矩阵 (n x n)
+        r: 半径
+        num_samples: 采样次数
+    
+    返回:
+        estimated_count: 估计的晶格点数量
+    """
+    n = B.shape[0]
+    count_within_r = 0
+
+    # 计算每个维度的采样范围 U
+    col_norms = np.linalg.norm(B, axis=0)
+    min_col_norm = np.min(col_norms)
+    if min_col_norm == 0:
+        raise ValueError("生成矩阵 B 存在列范数为零的情况，无法进行蒙特卡洛估计。")
+    U = int(np.ceil(r / min_col_norm)) + 1
+
+    # 随机采样整数向量 u ∈ [-U, U]^n
+    u_samples = np.random.randint(-U, U+1, size=(num_samples, n))
+
+    # 计算对应的晶格点
+    lattice_points = u_samples @ B.T  # shape: (num_samples, n)
+
+    # 计算范数
+    norms = np.linalg.norm(lattice_points, axis=1)
+
+    # 统计在半径 r 内的点数
+    count_within_r = np.sum(norms <= r)
+
+    # 估计体积 V
+    # n 维球体的体积 V_n(r) = (π^(n/2) / Γ(n/2 + 1)) * r^n
+    V_n_r = (np.pi ** (n / 2)) / gamma(n / 2 + 1) * (r ** n)
+    V_total = (2 * U) ** n
+
+    # 估计 N(B, r) = (count_within_r / num_samples) * (V_total / V_n_r)
+    estimated_count = (count_within_r / num_samples) * (V_total / V_n_r)
+
+    return estimated_count
+
+def plot_theta_image(B, r_max=10.0, r_step=0.1, output_file='theta_image.png', method='exact', num_samples=100000):
+    """
+    绘制 Theta 图像 N(B, r) 与 r^2 的关系
+    
+    参数:
+        B: 生成矩阵 (n x n)
+        r_max: 最大半径
+        r_step: 半径步长
+        output_file: 图像保存路径
+        method: 计算方法，'exact' 或 'monte_carlo'
+        num_samples: 蒙特卡洛方法的采样次数（仅在 method='monte_carlo' 时使用）
+    """
+    rs = np.arange(0, r_max + r_step, r_step)
+    N_values = []
+    
+    print(f"开始计算 N(B, r) 使用方法: {method}...")
+    for r in tqdm(rs, desc="计算 N(B, r)"):
+        if method == 'exact':
+            N = count_lattice_points(B, r)
+        elif method == 'monte_carlo':
+            N = count_lattice_points_monte_carlo(B, r, num_samples=num_samples)
+        else:
+            raise ValueError("method 参数必须为 'exact' 或 'monte_carlo'")
+        N_values.append(N)
+    
+    rs_squared = rs**2
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(rs_squared, N_values, drawstyle='steps-post')
+    plt.xlabel('$r^2$')
+    plt.ylabel('$N(B, r)$')
+    plt.title('Theta 图像 $N(B, r)$ vs $r^2$')
+    plt.grid(True)
+    plt.savefig(output_file)
+    plt.show()
+    print(f"Theta 图像已保存至 {output_file}")
 
 # ============ 主算法：迭代构造晶格基 ============
 
@@ -108,7 +227,13 @@ def iterative_lattice_construction(n,
                                    nu=2.0,
                                    tqdm_update_freq=1000,
                                    save_plots=False,
-                                   output_dir='B_plots'):
+                                   output_dir='B_plots',
+                                   compute_theta=False,
+                                   theta_r_max=10.0,
+                                   theta_r_step=0.1,
+                                   theta_output_file='theta_image.png',
+                                   theta_method='exact',
+                                   theta_num_samples=100000):
     """
     按题目伪代码，实现“迭代构造晶格基”
     参数:
@@ -119,6 +244,12 @@ def iterative_lattice_construction(n,
       tqdm_update_freq: 每多少次迭代更新一次进度条
       save_plots: 是否保存 B 矩阵的图像
       output_dir: 图像保存目录
+      compute_theta: 是否计算并绘制 Theta 图像
+      theta_r_max: Theta 图像的最大半径
+      theta_r_step: Theta 图像的半径步长
+      theta_output_file: Theta 图像的保存路径
+      theta_method: 计算 Theta 图像的方法，'exact' 或 'monte_carlo'
+      theta_num_samples: 蒙特卡洛方法的采样次数
     返回:
       B: 迭代后得到的生成矩阵
       norms_history: 记录每次 RED 后 B 矩阵的行范数
@@ -145,12 +276,12 @@ def iterative_lattice_construction(n,
     # 3. 主循环
     with tqdm(total=T, desc="迭代进度") as pbar:
         for t in range(T):
-            # 5. 更新 μ = μ0 * ν^(-t/(T-1))
+            # 5. 更新 μ = mu0 * nu^(-t/(T-1))
             if T > 1:
                 mu = mu0 * (nu ** ( - float(t) / (T - 1) ))
             else:
                 mu = mu0
-            
+
             # 6. z <- URAN(n)
             z = URAN(n)
 
@@ -200,6 +331,11 @@ def iterative_lattice_construction(n,
         if remaining > 0:
             pbar.update(remaining)
 
+    # 绘制最终的 B 矩阵和范数历史
+    if compute_theta:
+        plot_theta_image(B, r_max=theta_r_max, r_step=theta_r_step, output_file=theta_output_file,
+                        method=theta_method, num_samples=theta_num_samples)
+
     return B, norms_history
 
 # ============ 测试/示例 ============
@@ -212,9 +348,13 @@ if __name__ == "__main__":
     mu0 = 0.01
     nu = 500.0
 
-    # 启用保存图像
+    # 启用保存图像和 Theta 图像绘制
     B_final, norms_history = iterative_lattice_construction(
-        n, T, Tr, mu0, nu, save_plots=True, output_dir='B_plots'
+        n, T, Tr, mu0, nu, save_plots=True, output_dir='B_plots',
+        compute_theta=True, theta_r_max=10.0, theta_r_step=0.1,
+        theta_output_file='theta_image.png',
+        theta_method='monte_carlo',  # 选择使用蒙特卡洛方法
+        theta_num_samples=100000      # 设定采样次数
     )
     print("最终得到的 B 矩阵：")
     print(B_final)
