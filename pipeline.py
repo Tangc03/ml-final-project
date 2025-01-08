@@ -153,6 +153,8 @@ def plot_B_matrix(B):
     plt.xlabel('列索引')
     plt.ylabel('行索引')
     plt.show()
+    # save the plot
+    plt.savefig('B_matrix.png')
 
 def save_B_matrix_plot(B, iteration, output_dir='B_plots'):
     """
@@ -300,7 +302,7 @@ if __name__ == "__main__":
 
     # 参数设置
     n = 3              # 维度（低维度以便使用确切计数）
-    T = 10000          # 迭代次数
+    T = int(1e5)          # 迭代次数
     Tr = 1000          # 每 Tr 次迭代进行一次 RED + ORTH
     mu0 = 0.01         # 初始步长
     nu = 500.0         # 步长衰减因子
@@ -350,6 +352,8 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.show()
+    # save the plot
+    plt.savefig('Theta_evolution.png')
 
     # 最终 Theta 图像：N(B, r) 与 r^2 的关系
     # 选择最后一次记录的 N(B, r) 值
@@ -364,3 +368,5 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.show()
+    # save the plot
+    plt.savefig('Final_Theta.png')
