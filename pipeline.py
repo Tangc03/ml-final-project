@@ -55,27 +55,29 @@ def ORTH(B):
 def CLP(B, x):
     """
     Closest Lattice Point function:
-    给定生成矩阵 B 和一个点 x，找到使得 u*B 最接近 x 的整数向量 u。
-    （返回的是 u 而非最近点本身）
+    给定生成矩阵 B 和目标点 x，返回最近晶格点所对应的整数向量 u_hat ∈ Z^n。
+    这里必须使用 new_search_fixed.py 的 search_nearest_point 方法。
     
-    这里我们演示一个“先将 B 转为下三角，再调用 search_nearest_point”的做法：
-      1) 找到一个正交矩阵 Q，使得 B = Q * L (L下三角)。
-         为简化，此处我们直接用 ORTH(B) 得到一个下三角 L' ≈ B 的某种正交变换；
-         实际若想严格满足 B = Q*L，需要做进一步分解，这里仅作示例。
-      2) 把 x 也变换到与 L 对齐的坐标系 r = Q^T x
-      3) 调用 search_nearest_point(n, L, r) 得到整向量 u
-      4) 这里演示版本只是直接对 B 做 ORTH(B)；严格场合需保留 Q 方便做坐标变换
-         简化起见，这里只演示“B 先求逆”然后再四舍五入，也可以。
-
-    实际工程中，CLP 是个不简单的问题。下述实现仅作示例！
+    步骤：
+      1) 做 B^T = Q * R => B = R^T * Q^T，使得 L = R^T 是下三角。
+      2) r = Q^T x 将 x 转到下三角坐标系。
+      3) 调用 search_nearest_point(n, L, r) 搜索 u_hat（在其内部维度可能多 1，需截取）。
+      4) 返回 u_hat (形状 n 的整数向量)。
     """
-    # ---- 简易方法：u = round(inv(B)*x) ----
-    #    注意这种方法对 B 未必是最佳近邻，但代码简单。
-    #    若要用 search_nearest_point，需把 B 真正拆成下三角 L 和正交 Q。
-    #    这里为不繁琐，演示“直接逆阵 + 四舍五入”方法：
-    z_float = np.linalg.inv(B) @ x
-    u_hat = np.rint(z_float)  # 逐坐标就近取整
-    return u_hat  # 返回整数向量
+    # 1) B^T = Q * R
+    Q, R = np.linalg.qr(B.T)
+    # 2) L = R^T (下三角)，将 x 转到新坐标
+    L = R.T.copy()
+    r = Q.T @ x
+
+    # 3) 调 search_nearest_point, 它返回一个长度 n+1 的数组 u_hat，
+    #    其中 u_hat[1..n] 才是真正的整数向量 (见 new_search_fixed.py 注释)。
+    u_hat_full = search_nearest_point(L.shape[0], L, r)  # n, L, r
+    # 取后 n 个分量为真正的解
+    # 因为 new_search_fixed.py 中定义的 u_hat 是 1-based: u_hat[1..n]
+    u_hat = np.round(u_hat_full[1:]).astype(int)
+
+    return u_hat  # 返回 Z^n 中的整向量
 
 # ============ 主算法：迭代构造晶格基 ============
 
@@ -95,58 +97,51 @@ def iterative_lattice_construction(n,
       B: 迭代后得到的生成矩阵
     """
 
-    # 1. 初始: B <- ORTH(RED(GRAN(n,n)))
-    B_init = GRAN(n, n)                 # 高斯随机
-    B_red  = RED(B_init)                # LLL 约减
-    B = ORTH(B_red)                     # 再正交化/转下三角
-    
-    # 2. 令 V = (∏ B[i,i])^(-1/n)，再做一次缩放，让 det(B) ~ 1
-    #   这里演示取对角线乘积为 diag_prod
+    # 1. B <- ORTH( RED( GRAN(n,n) ) )
+    B_init = GRAN(n, n)   # 高斯随机初始化
+    B_red  = RED(B_init)  # LLL 约减
+    B = ORTH(B_red)       # 正交化为下三角
+
+    # 2. B <- V^(-1/n) * B, 其中 V = ∏ B[i,i]
     diag_prod = 1.0
     for i in range(n):
         diag_prod *= B[i, i]
-    # 如果对角线上有负值，上面 ORTH 里已经处理过了，这里假设其全为正
     alpha = diag_prod ** (-1.0 / n)
-    B = alpha * B   # B <- alpha * B
+    B = alpha * B
 
-    # 主循环
+    # 3. 主循环
     for t in range(T):
-        # 5. μ <- μ0 * ν^(- t/(T-1))   (若 T=1，为避免 0/0，这里做个保护)
+        # 5. 更新 μ = μ0 * ν^(-t/(T-1))
         if T > 1:
-            mu = mu0 * (nu ** ( - float(t)/(T-1) ))
+            mu = mu0 * (nu ** ( - float(t) / (T - 1) ))
         else:
             mu = mu0
         
-        # 6. z <- URAN(n)    (均匀随机向量)
+        # 6. z <- URAN(n)
         z = URAN(n)
-        
-        # 7. y <- z - CLP(B, zB)
-        zB = z @ B          # z 是 1 x n, B 是 n x n => zB 仍是长度 n 的向量
-        u_hat = CLP(B, zB)  # 最近点对应的整数向量
-        y = z - u_hat       # 这里 y 作为一个 n 维向量
-        
+
+        # 7. u_hat <- CLP(B, zB)，然后 y = z - u_hat
+        zB = z @ B           # z 是 1×n, B 是 n×n => zB 仍是 n 维向量
+        u_hat = CLP(B, zB)   # 最近点对应的整向量
+        y = z - u_hat        # 仍是 n 维向量
+
         # 8. e <- yB
-        e = y @ B  # 仍然是 n 维
-        
-        # 9~14: 更新 B 的各分量
-        #    for i=1..n:
-        #      for j=1..(i-1):
-        #         B[i,j] = B[i,j] - mu * y[i]* e[j]
-        #      B[i,i] = B[i,i] - mu * ( y[i]* e[i] - ||e||^2/( n * B[i,i] ) )
-        #
-        # 注意 Python 下标是 0..n-1，所以要做适配
+        e = y @ B
+
+        # 9~14: 更新 B[i,j]
         e_norm_sq = np.linalg.norm(e)**2
         for i_idx in range(n):
             for j_idx in range(i_idx):
                 B[i_idx, j_idx] -= mu * y[i_idx] * e[j_idx]
-            # 对角项
-            B_ii = B[i_idx, i_idx]
-            B[i_idx, i_idx] = B_ii - mu * ( y[i_idx]*e[i_idx] - e_norm_sq/(n * B_ii) )
+            # 对角元素
+            bii = B[i_idx, i_idx]
+            B[i_idx, i_idx] = bii - mu * ( y[i_idx]*e[i_idx] - e_norm_sq / (n * bii) )
 
-        # 15. 如果 (t mod Tr) = Tr - 1，则再做一次约减 + 正交化 + 规模调整
+        # 15. 每隔 Tr 步做一次 B <- ORTH( RED( B ) )
         if (t % Tr) == (Tr - 1):
-            B = ORTH(RED(B))
-            # 再做一次类似 (∏ B[i,i])^(-1/n) 的缩放
+            B = RED(B)
+            B = ORTH(B)
+            # 再做一次 (∏ B[i,i])^(-1/n) 的缩放
             diag_prod = 1.0
             for i in range(n):
                 diag_prod *= B[i, i]
@@ -155,12 +150,13 @@ def iterative_lattice_construction(n,
 
     return B
 
-# ============ 调试或测试 ============
+# ============ 测试/示例 ============
 
 if __name__ == "__main__":
-    n = 4       # 维度
-    T = 5       # 迭代次数
-    Tr = 2      # 每隔多少步做一次 RED+ORTH
+    np.random.seed(42)  # 固定随机种子便于演示
+    n = 4      # 维度
+    T = 5      # 迭代次数
+    Tr = 2     # 每隔多少步做一次 RED+ORTH
     mu0 = 0.5
     nu = 2.0
 
