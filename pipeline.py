@@ -5,6 +5,10 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import os
 
+# 设置全局字体为支持中文的字体（如 SimHei 或 Microsoft YaHei）
+plt.rcParams['font.family'] = 'Microsoft YaHei' # 使用微软雅黑字体
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+
 # ============ 一些基础函数 ============
 
 def GRAN(n, m):
@@ -81,6 +85,7 @@ def plot_B_matrix(B):
     plt.xlabel('列索引')
     plt.ylabel('行索引')
     plt.show()
+    plt.savefig('B_matrix.png')
 
 def plot_norms_history(norms_history):
     norms_history = np.array(norms_history)
@@ -92,6 +97,7 @@ def plot_norms_history(norms_history):
     plt.title('B 矩阵行向量范数的变化')
     plt.legend()
     plt.show()
+    plt.savefig('norms_history.png')
 
 # ============ 主算法：迭代构造晶格基 ============
 
