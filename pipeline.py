@@ -154,11 +154,11 @@ def iterative_lattice_construction(n,
 
 if __name__ == "__main__":
     np.random.seed(42)  # 固定随机种子便于演示
-    n = 5      # 维度
-    T = 10      # 迭代次数
-    Tr = 2     # 每隔多少步做一次 RED+ORTH
-    mu0 = 0.5
-    nu = 2.0
+    n = 10      # 维度
+    T = int(1e7)      # 迭代次数
+    Tr = 100     # 每隔多少步做一次 RED+ORTH
+    mu0 = 0.01
+    nu = 500.0
 
     B_final = iterative_lattice_construction(n, T, Tr, mu0, nu)
     print("最终得到的 B 矩阵：")
