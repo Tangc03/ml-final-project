@@ -154,8 +154,8 @@ def iterative_lattice_construction(n,
 
 if __name__ == "__main__":
     np.random.seed(42)  # 固定随机种子便于演示
-    n = 4      # 维度
-    T = 5      # 迭代次数
+    n = 5      # 维度
+    T = 10      # 迭代次数
     Tr = 2     # 每隔多少步做一次 RED+ORTH
     mu0 = 0.5
     nu = 2.0
