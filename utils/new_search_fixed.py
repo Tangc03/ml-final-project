@@ -75,7 +75,7 @@ def search_nearest_point(n:int,G:np.array,r:np.array)->np.array:
         while(not loop_flag):
             
             if (i==n):
-                print(f'exit when i={i},lamda[i]={lamda[i]}')
+                # print(f'exit when i={i},lamda[i]={lamda[i]}')
                 return u_hat
             else:
                 i=i+1
