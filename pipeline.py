@@ -363,6 +363,7 @@ if __name__ == "__main__":
 
     n_list = [10, 11, 12, 13, 14, 15, 16]
     for n in n_list:
+        print(f"开始计算维度为 {n} 的晶格基...")
         # 启用保存图像和 Theta 图像绘制
         B_final, norms_history = iterative_lattice_construction(
             n, T, Tr, mu0, nu, save_plots=True, output_dir='B_plots/n_{}'.format(n),
