@@ -1,4 +1,6 @@
 import numpy as np
+from utils.LLL import LLL_reduction, gramschmidt
+from utils.new_search_fixed import search_nearest_point
 
 # Placeholder functions
 def URAN(n):
@@ -11,18 +13,19 @@ def GRAN(n, m):
 
 def CLP(B, x):
     # Closest lattice point function: return the closest lattice point to x
-    # Placeholder implementation
-    return np.round(np.linalg.solve(B, x))
+    n = B.shape[0]
+    G = np.linalg.cholesky(B @ B.T)  # Ensure G is lower triangular
+    nearest_point = search_nearest_point(n, G, x)
+    return nearest_point[1:]  # Return only the first n elements (ignore the extra element)
 
 def RED(B):
-    # Reduction: return a reduced generator matrix
-    # Placeholder implementation (e.g., LLL algorithm)
-    return B
+    # Reduction: return a reduced generator matrix using LLL algorithm
+    return LLL_reduction(B)
 
 def ORTH(B):
     # Orthogonal transformation: return an orthogonalized matrix
-    # Placeholder implementation (e.g., Cholesky decomposition)
-    return np.linalg.cholesky(B @ B.T)
+    # Use Gram-Schmidt to orthogonalize the basis
+    return np.array(gramschmidt(B))
 
 def iterative_lattice_construction(n, T, Tr):
     # Step 1: Initialize B with orthogonal reduction
