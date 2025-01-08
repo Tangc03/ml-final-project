@@ -1,7 +1,9 @@
 import numpy as np
 from utils.LLL import LLL_reduction
 from utils.new_search_fixed import search_nearest_point, sign
-from tqdm import tqdm  # 导入 tqdm
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+import os
 
 # ============ 一些基础函数 ============
 
@@ -26,28 +28,19 @@ def RED(B):
     这里直接调用给出的 LLL_reduction。
     注意：LLL_reduction 输入输出都是“列表的列表”形式，这里需要做适配。
     """
-    # B 可能是 numpy 数组，LLL_reduction 里直接操作列表。
-    # 先转成 list of list:
     basis_list = B.tolist()
     reduced_list = LLL_reduction(basis_list)
-    # 再转回 numpy array:
     return np.array(reduced_list)
 
 def ORTH(B):
     """
     Orthogonal transformation:
     用正交变换(旋转/反射等)将 B 转化为一个下三角、且对角元素为正的方阵。
-    这里为了演示，使用 QR 分解 + 调整正负号的做法：
-      B^T = Q * R  =>  B = R^T * Q^T
-    如果我们把 R^T 作为新 B，就可以得到一个下三角(转置后原先的 R 是上三角)。
-    然后再把对角线确保为正即可。
+    使用 QR 分解 + 调整正负号的做法。
     """
-    # B^T = Q * R
     Q, R = np.linalg.qr(B.T)
-    # R^T 就是下三角
     B_new = R.T.copy()
     n = B_new.shape[0]
-    # 将对角线元素调成正值（如果是负的，就整行取负，从而相当于一次反射）
     for i in range(n):
         if B_new[i, i] < 0:
             B_new[i, :] = -B_new[i, :]
@@ -57,28 +50,48 @@ def CLP(B, x):
     """
     Closest Lattice Point function:
     给定生成矩阵 B 和目标点 x，返回最近晶格点所对应的整数向量 u_hat ∈ Z^n。
-    这里必须使用 new_search_fixed.py 的 search_nearest_point 方法。
-    
-    步骤：
-      1) 做 B^T = Q * R => B = R^T * Q^T，使得 L = R^T 是下三角。
-      2) r = Q^T x 将 x 转到下三角坐标系。
-      3) 调用 search_nearest_point(n, L, r) 搜索 u_hat（在其内部维度可能多 1，需截取）。
-      4) 返回 u_hat (形状 n 的整数向量)。
+    使用 new_search_fixed.py 的 search_nearest_point 方法。
     """
-    # 1) B^T = Q * R
     Q, R = np.linalg.qr(B.T)
-    # 2) L = R^T (下三角)，将 x 转到新坐标
     L = R.T.copy()
     r = Q.T @ x
 
-    # 3) 调 search_nearest_point, 它返回一个长度 n+1 的数组 u_hat，
-    #    其中 u_hat[1..n] 才是真正的整数向量 (见 new_search_fixed.py 注释)。
     u_hat_full = search_nearest_point(L.shape[0], L, r)  # n, L, r
-    # 取后 n 个分量为真正的解
-    # 因为 new_search_fixed.py 中定义的 u_hat 是 1-based: u_hat[1..n]
     u_hat = np.round(u_hat_full[1:]).astype(int)
 
     return u_hat  # 返回 Z^n 中的整向量
+
+def save_B_matrix_plot(B, iteration, output_dir='B_plots'):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    plt.figure(figsize=(6, 5))
+    plt.imshow(B, cmap='viridis', aspect='auto')
+    plt.colorbar(label='值')
+    plt.title(f'B 矩阵 at Iteration {iteration}')
+    plt.xlabel('列索引')
+    plt.ylabel('行索引')
+    plt.savefig(os.path.join(output_dir, f'B_iter_{iteration}.png'))
+    plt.close()
+
+def plot_B_matrix(B):
+    plt.figure(figsize=(8, 6))
+    plt.imshow(B, cmap='viridis', aspect='auto')
+    plt.colorbar(label='值')
+    plt.title('最终得到的 B 矩阵')
+    plt.xlabel('列索引')
+    plt.ylabel('行索引')
+    plt.show()
+
+def plot_norms_history(norms_history):
+    norms_history = np.array(norms_history)
+    plt.figure(figsize=(10, 6))
+    for i in range(norms_history.shape[1]):
+        plt.plot(norms_history[:, i], label=f'行 {i+1} 的范数')
+    plt.xlabel('RED+ORTH 迭代次数')
+    plt.ylabel('行向量范数')
+    plt.title('B 矩阵行向量范数的变化')
+    plt.legend()
+    plt.show()
 
 # ============ 主算法：迭代构造晶格基 ============
 
@@ -87,18 +100,25 @@ def iterative_lattice_construction(n,
                                    Tr=3,
                                    mu0=1.0,
                                    nu=2.0,
-                                   tqdm_update_freq=1000):
+                                   tqdm_update_freq=1000,
+                                   save_plots=False,
+                                   output_dir='B_plots'):
     """
     按题目伪代码，实现“迭代构造晶格基”
     参数:
       n: 维度
       T: 主循环次数 (for t in [0..T-1])
       Tr: 每多少次迭代进行一次重新约减 + 正交化
-      mu0, nu: 用于更新步长 μ 的参数 (μ = μ0 * ν^(-t/(T-1)))
+      mu0, nu: 用于更新步长 μ 的参数 (μ = mu0 * nu^(-t/(T-1)))
       tqdm_update_freq: 每多少次迭代更新一次进度条
+      save_plots: 是否保存 B 矩阵的图像
+      output_dir: 图像保存目录
     返回:
       B: 迭代后得到的生成矩阵
+      norms_history: 记录每次 RED 后 B 矩阵的行范数
     """
+
+    norms_history = []
 
     # 1. B <- ORTH( RED( GRAN(n,n) ) )
     B_init = GRAN(n, n)   # 高斯随机初始化
@@ -111,6 +131,10 @@ def iterative_lattice_construction(n,
         diag_prod *= B[i, i]
     alpha = diag_prod ** (-1.0 / n)
     B = alpha * B
+
+    # 记录初始的范数
+    norms = np.linalg.norm(B, axis=1)
+    norms_history.append(norms.copy())
 
     # 3. 主循环
     with tqdm(total=T, desc="迭代进度") as pbar:
@@ -152,6 +176,15 @@ def iterative_lattice_construction(n,
                 alpha = diag_prod ** (-1.0 / n)
                 B = alpha * B
 
+                # 记录当前 B 矩阵的行范数
+                norms = np.linalg.norm(B, axis=1)
+                norms_history.append(norms.copy())
+
+                # 保存 B 矩阵的图像
+                if save_plots:
+                    iteration = t + 1
+                    save_B_matrix_plot(B, iteration, output_dir)
+
             # 每 tqdm_update_freq 步更新一次进度条
             if (t + 1) % tqdm_update_freq == 0:
                 pbar.update(tqdm_update_freq)
@@ -161,18 +194,23 @@ def iterative_lattice_construction(n,
         if remaining > 0:
             pbar.update(remaining)
 
-    return B
+    return B, norms_history
 
 # ============ 测试/示例 ============
 
 if __name__ == "__main__":
     np.random.seed(42)  # 固定随机种子便于演示
-    n = 10          # 维度
-    T = int(1e7)     # 迭代次数
-    Tr = 100        # 每隔多少步做一次 RED+ORTH
+    n = 10             # 维度
+    T = int(1e5)       # 迭代次数，示例中使用较小的值
+    Tr = 100           # 每隔多少步做一次 RED+ORTH
     mu0 = 0.01
     nu = 500.0
 
-    B_final = iterative_lattice_construction(n, T, Tr, mu0, nu)
+    # 启用保存图像
+    B_final, norms_history = iterative_lattice_construction(
+        n, T, Tr, mu0, nu, save_plots=True, output_dir='B_plots'
+    )
     print("最终得到的 B 矩阵：")
     print(B_final)
+    plot_B_matrix(B_final)
+    plot_norms_history(norms_history)
