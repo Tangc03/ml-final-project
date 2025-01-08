@@ -86,7 +86,7 @@ def plot_B_matrix(B, output_file='B_matrix.png'):
     plt.xlabel('列索引')
     plt.ylabel('行索引')
     plt.savefig(output_file)
-    plt.show()
+    # plt.show()
 
 def plot_norms_history(norms_history, output_file='norms_history.png'):
     norms_history = np.array(norms_history)
@@ -98,7 +98,7 @@ def plot_norms_history(norms_history, output_file='norms_history.png'):
     plt.title('B 矩阵行向量范数的变化')
     plt.legend()
     plt.savefig(output_file)
-    plt.show()
+    # plt.show()
 
 # ============ Theta 图像绘制相关函数 ============
 
@@ -215,7 +215,7 @@ def plot_theta_image(B, r_max=10.0, r_step=0.1, output_file='theta_image.png', m
     plt.title('Theta 图像 $N(B, r)$ vs $r^2$')
     plt.grid(True)
     plt.savefig(output_file)
-    plt.show()
+    # plt.show()
     print(f"Theta 图像已保存至 {output_file}")
 
 # ============ 主算法：迭代构造晶格基 ============
