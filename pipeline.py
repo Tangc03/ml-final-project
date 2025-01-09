@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import os
 from scipy.special import gamma  # 导入伽玛函数
 
+from utils.compute_nsm import compute_nsm
+
 # 设置全局字体为支持中文的字体（如 SimHei 或 Microsoft YaHei）
 plt.rcParams['font.family'] = 'Microsoft YaHei' # 使用微软雅黑字体
 plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
@@ -343,7 +345,7 @@ def iterative_lattice_construction(n,
 if __name__ == "__main__":
     np.random.seed(42)  # 固定随机种子便于演示
     # n = 10             # 维度
-    T = int(1e6)       # 迭代次数，示例中使用较小的值
+    T = int(1e4)       # 迭代次数，示例中使用较小的值
     Tr = 100           # 每隔多少步做一次 RED+ORTH
     mu0 = 0.005
     nu = 200.0
@@ -360,8 +362,19 @@ if __name__ == "__main__":
     # print(B_final)
     # plot_B_matrix(B_final)
     # plot_norms_history(norms_history)
+    
+    # creating folder for saving images
+    # only work on Windows machine
+    os.system('rd /s /q theta_images')
+    os.makedirs('theta_images')
+    os.system('rd /s /q B_matrixes')
+    os.makedirs('B_matrixes')
+    os.system('rd /s /q norms_histories')
+    os.makedirs('norms_histories')
 
-    n_list = [10, 11, 12, 13, 14, 15, 16]
+    nsm=[]
+    n_list=[10,11]
+    #n_list = [10, 11, 12, 13, 14, 15, 16]
     for n in n_list:
         print(f"开始计算维度为 {n} 的晶格基...")
         # 启用保存图像和 Theta 图像绘制
@@ -374,5 +387,13 @@ if __name__ == "__main__":
         )
         print("最终得到的 B 矩阵：")
         print(B_final)
+        nsm.append(compute_nsm(B_final))
+        #calcualte nsm and save to .txt document
+
         plot_B_matrix(B_final, output_file='B_matrixes/B_matrix_n_{}.png'.format(n))
         plot_norms_history(norms_history, output_file='norms_histories/norms_history_n_{}.png'.format(n))
+    
+    with open('nsm.txt','w') as f:
+        for i in nsm:
+            f.write(f'{str(i)}\n')
+    print("FINISHED")

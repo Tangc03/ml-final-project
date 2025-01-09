@@ -1,5 +1,5 @@
 import numpy as np
-from new_search_fixed import search_nearest_point, sign
+from utils.new_search_fixed import search_nearest_point, sign
 def compute_nsm( B:np.array)->np.float32:
     #n: dimension of the generator matrix B
     n = B.shape[0]
